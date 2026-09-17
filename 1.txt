@@ -1,276 +1,153 @@
-1)
+7)
 
-mkdir Experiment1
-cd Experiment1
-notepad key_generation.py
+Create BalanceTransfer.sol:
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.0;
+contract BalanceTransfer {
+    address public owner;
+    // Runs once during deployment.
+    // "payable" allows Ether to be supplied during deployment.
+    constructor() payable {
+        owner = msg.sender;
+    }
 
-import subprocess
-def generate_rsa_keys():
-    subprocess.run([
-        "openssl", "genpkey",
-        "-algorithm", "RSA",
-        "-pkeyopt", "rsa_keygen_bits:2048",
-        "-out", "private.pem"
-    ], check=True)
+    // Receives Ether when no calldata is supplied.
+    receive() external payable {}
 
-    subprocess.run([
-        "openssl", "pkey",
-        "-in", "private.pem",
-        "-pubout",
-        "-out", "public.pem"
-    ], check=True)
+    // Receives Ether when unknown calldata is supplied.
+    fallback() external payable {}
 
-    with open("public.pem", "r") as file:
-        print(file.read())
+    // Transfers Ether from the contract to another address.
+    function transfer(
+        address payable _to,
+        uint256 _amount
+    ) public {
+        require(
+            msg.sender == owner,
+            "Only Contract owner can transfer balance"
+        );
 
-    print("Keys generated successfully")
+        require(
+            _to != address(0),
+            "Invalid recipient address"
+        );
 
+        require(
+            address(this).balance >= _amount,
+            "Insufficient balance in contract"
+        );
 
-generate_rsa_keys()
+        _to.transfer(_amount);
+    }
 
-python key_generation.py
-Get-Content public.pem
-
-2)
-mkdir Experiment2
-cd Experiment2
-notepad blockchain.py
-
-import hashlib
-import time
-class Block:
-    def __init__(self, index, timestamp, data, previous_hash):
-        self.index = index
-        self.timestamp = timestamp
-        self.data = data
-        self.previous_hash = previous_hash
-        self.hash = self.calculate_hash()
-    def calculate_hash(self):
-        block_data = (
-            str(self.index)
-            + str(self.timestamp)
-            + str(self.data)
-            + str(self.previous_hash)
-        )
-
-        return hashlib.sha256(block_data.encode()).hexdigest()
-class Blockchain:
-    def __init__(self):
-        self.chain = [self.create_genesis_block()]
-
-    def create_genesis_block(self):
-        return Block(
-            0,
-            time.ctime(),
-            "Genesis Block",
-            "0"
-        )
-
-    def get_latest_block(self):
-        return self.chain[-1]
-
-    def add_block(self, new_data):
-        previous_block = self.get_latest_block()
-
-        new_block = Block(
-            len(self.chain),
-            time.ctime(),
-            new_data,
-            previous_block.hash
-        )
-
-        self.chain.append(new_block)
-    def is_chain_valid(self):
-        for index in range(1, len(self.chain)):
-            current_block = self.chain[index]
-            previous_block = self.chain[index - 1]
-
-            if current_block.hash != current_block.calculate_hash():
-                print("Block", index, "has been tampered!")
-                return False
-
-            if current_block.previous_hash != previous_block.hash:
-                print("Previous hash does not match!")
-                return False
-
-        return True
-my_chain = Blockchain()
-my_chain.add_block("Alice pays Bob 10 coins")
-my_chain.add_block("Bob pays Charlie 5 coins")
-my_chain.add_block("Charlie pays Dave 2 coins")
-for block in my_chain.chain:
-    print("Index:", block.index)
-    print("Timestamp:", block.timestamp)
-    print("Data:", block.data)
-    print("Hash:", block.hash)
-    print("Previous Hash:", block.previous_hash)
-    print("-" * 50)
-# Validate the blockchain
-print("Is blockchain valid?", my_chain.is_chain_valid())
-
-python blockchain.py
+    // Returns the contract's balance in Wei.
+    function getContractBalance()
+        public
+        view
+        returns (uint256)
+    {
+        return address(this).balance;
+    }
+}
 
 
-3)
+In VALUE, enter 1 and select ETHER.
+Select BalanceTransfer and click Deploy.
+Expand the contract under Deployed Contracts.
+Click owner and confirm it shows Account 1’s address.
+Click getContractBalance and confirm:
+1. Click getContractBalance and confirm:
+1000000000000000000
+15. Switch to Account 2.
+16. Set VALUE to 0.5 ETHER or 500 FINNEY.
+17. Under Low level interactions, leave Calldata empty and click Transact.
+18. Click getContractBalance and confirm:
+1500000000000000000
+19. Select Account 3 and copy its address.
+20. Switch back to Account 1.
+21. In the transfer function, enter:
+_to: Account 3 address
+_amount: 200000000000000000
+22. Click transfer.
+23. Click getContractBalance and confirm:
+1300000000000000000
+
+
+--------------------------------------------------------------------------
+
+
+8)
+Create LabCoin.sol:
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract Storage {
-    uint256 public myNumber;
+contract LabCoin {
+    string public name = "LabCoin";
+    string public symbol = "LAB";
+    uint8 public decimals = 18;
 
-    function store(uint256 num) public {
-        myNumber = num;
+    uint256 public totalSupply;
+
+    mapping(address => uint256) public balanceOf;
+
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 value
+    );
+
+    constructor(uint256 _initialSupply) {
+        totalSupply =
+            _initialSupply *
+            (10 ** uint256(decimals));
+
+        balanceOf[msg.sender] = totalSupply;
+
+        emit Transfer(
+            address(0),
+            msg.sender,
+            totalSupply
+        );
     }
 
-    function retrieve() public view returns (uint256) {
-        return myNumber;
-    }
-}
+    function transfer(
+        address _to,
+        uint256 _value
+    ) public returns (bool success) {
+        require(
+            _to != address(0),
+            "Invalid recipient address"
+        );
 
-Compile the contract
-1. Click the Solidity Compiler icon.
-2. Select a compatible compiler such as 0.8.20.
-3. For an older Ganache version, open Advanced Configurations.
-4. Change EVM Version to:
-Istanbul
+        require(
+            balanceOf[msg.sender] >= _value,
+            "Insufficient balance"
+        );
 
-Connect Remix to Ganache
-1. Open Deploy & Run Transactions.
-2. Open the Environment dropdown.
-3. Select:
-External HTTP Provider
-4. Enter:
-http://127.0.0.1:7545
+        balanceOf[msg.sender] -= _value;
+        balanceOf[_to] += _value;
 
-1. Confirm that Storage is selected under Contract.
-2. Click the orange Deploy button.
-3. Look under Deployed Contracts.
-4. Expand the deployed Storage contract.
-A successful deployment shows a green transaction in the Remix terminal.
-Step 8: Test retrieve()
+        emit Transfer(
+            msg.sender,
+            _to,
+            _value
+        );
 
-
-4)
-
-1. Open File Explorer.
-2. Open the contracts folder.
-3. Click New File.
-4. Name it:
-SimpleStorage.sol
-
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
-
-contract SimpleStorage {
-    uint256 private myNumber;
-
-    function store(uint256 newNumber) public {
-        myNumber = newNumber;
-    }
-
-    function retrieve() public view returns (uint256) {
-        return myNumber;
+        return true;
     }
 }
 
-Open Deploy & Run Transactions.
-Select Injected Provider – MetaMask or Testnet – Sepolia.
-Approve the connection in MetaMask.
-
-
-5)
-mkdir BlockchainLab
-cd BlockchainLab
-python -m venv venv
-.\venv\Scripts\Activate.ps1       // python3 -m venv venv
-				     source venv/bin/activate
-
-python -m pip install "web3[tester]"
-notepad wallet.py
-
-import cmd
-from web3 import Web3, EthereumTesterProvider
-
-
-class Wallet(cmd.Cmd):
-    prompt = "(crypto)> "
-
-    def __init__(self):
-        super().__init__()
-        self.w3 = Web3(EthereumTesterProvider())
-
-        accounts = self.w3.eth.accounts
-        self.users = {
-            "bank": accounts[0],
-            "alice": accounts[1],
-            "bob": accounts[2],
-            "charlie": accounts[3]
-        }
-
-        print("Blockchain started")
-        print("Users: bank, alice, bob, charlie")
-        print("Commands: balance, send, chain, exit")
-
-    def do_balance(self, name):
-        """Usage: balance alice"""
-
-        name = name.lower().strip()
-
-        if name not in self.users:
-            print("User not found")
-            return
-
-        address = self.users[name]
-        balance = self.w3.eth.get_balance(address)
-
-        print("Address:", address)
-        print("Balance:", self.w3.from_wei(balance, "ether"), "ETH")
-
-    def do_send(self, text):
-        """Usage: send bank alice 10"""
-
-        try:
-            sender, receiver, amount = text.lower().split()
-
-            transaction = {
-                "from": self.users[sender],
-                "to": self.users[receiver],
-                "value": self.w3.to_wei(amount, "ether")
-            }
-
-            tx_hash = self.w3.eth.send_transaction(transaction)
-            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-
-            print("Transaction successful")
-            print("Hash:", tx_hash.hex())
-            print("Block:", receipt.blockNumber)
-            print("Gas used:", receipt.gasUsed)
-
-        except Exception as error:
-            print("Transaction failed:", error)
-
-    def do_chain(self, text):
-        """Display the latest block."""
-
-        block = self.w3.eth.get_block("latest")
-
-        print("Block number:", block.number)
-        print("Block hash:", block.hash.hex())
-        print("Transactions:", len(block.transactions))
-
-    def do_exit(self, text):
-        """Close the program."""
-
-        print("Closing wallet")
-        return True
-
-
-Wallet().cmdloop()
-
-python wallet.py
-
-balance bank
-balance alice
-send bank alice 50.5
-balance bank
-chain
+1. Deploy LabCoin with initial supply:
+1000
+2. The contract creates:
+1000000000000000000000
+3. All 1,000 LAB initially belong to Account 1.
+4. To send 50 LAB, transfer:
+50000000000000000000
+5. After transferring 50 LAB to Account 2:
+Account 1: 950 LAB
+Account 2: 50 LAB
+Internal balances:
+Account 1: 950000000000000000000
+Account 2: 50000000000000000000
